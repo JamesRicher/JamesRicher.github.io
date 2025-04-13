@@ -1,5 +1,5 @@
 ---
-date: '2025-04-09'
+date: '2025-04-13'
 draft: false
 title: 'FFT-Based Water Rendering Part 3: Switching to the FFT'
 params:
