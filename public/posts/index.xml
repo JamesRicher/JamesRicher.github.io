@@ -2,24 +2,24 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Posts on James&#39; Graphics Blog</title>
-    <link>https://example.org/posts/</link>
+    <link>https://jamesricher.github.io/posts/</link>
     <description>Recent content in Posts on James&#39; Graphics Blog</description>
     <generator>Hugo -- 0.145.0</generator>
     <language>en-us</language>
     <lastBuildDate>Wed, 09 Apr 2025 00:00:00 +0000</lastBuildDate>
-    <atom:link href="https://example.org/posts/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="https://jamesricher.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>FFT-Based Water Rendering Part 1: Building the Heightfield</title>
-      <link>https://example.org/posts/first/</link>
+      <link>https://jamesricher.github.io/posts/first/</link>
       <pubDate>Fri, 04 Apr 2025 00:00:00 +0000</pubDate>
-      <guid>https://example.org/posts/first/</guid>
+      <guid>https://jamesricher.github.io/posts/first/</guid>
       <description>write a summary here</description>
     </item>
     <item>
       <title>FFT-Based Water Rendering Part 2: Normals and Ocean Swell</title>
-      <link>https://example.org/posts/second/</link>
+      <link>https://jamesricher.github.io/posts/second/</link>
       <pubDate>Tue, 08 Apr 2025 00:00:00 +0000</pubDate>
-      <guid>https://example.org/posts/second/</guid>
+      <guid>https://jamesricher.github.io/posts/second/</guid>
       <description>&lt;style&gt;
     .pixelated {
         image-rendering: pixelated;
@@ -47,9 +47,9 @@
     </item>
     <item>
       <title>FFT-Based Water Rendering Part 3: Switching to the FFT</title>
-      <link>https://example.org/posts/third/</link>
+      <link>https://jamesricher.github.io/posts/third/</link>
       <pubDate>Wed, 09 Apr 2025 00:00:00 +0000</pubDate>
-      <guid>https://example.org/posts/third/</guid>
+      <guid>https://jamesricher.github.io/posts/third/</guid>
       <description>&lt;style&gt;
     .pixelated {
         image-rendering: pixelated;

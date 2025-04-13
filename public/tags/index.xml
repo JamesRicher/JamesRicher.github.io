@@ -2,31 +2,31 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Tags on James&#39; Graphics Blog</title>
-    <link>https://example.org/tags/</link>
+    <link>https://jamesricher.github.io/tags/</link>
     <description>Recent content in Tags on James&#39; Graphics Blog</description>
     <generator>Hugo -- 0.145.0</generator>
     <language>en-us</language>
     <lastBuildDate>Fri, 04 Apr 2025 00:00:00 +0000</lastBuildDate>
-    <atom:link href="https://example.org/tags/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="https://jamesricher.github.io/tags/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>HLSL</title>
-      <link>https://example.org/tags/hlsl/</link>
+      <link>https://jamesricher.github.io/tags/hlsl/</link>
       <pubDate>Fri, 04 Apr 2025 00:00:00 +0000</pubDate>
-      <guid>https://example.org/tags/hlsl/</guid>
+      <guid>https://jamesricher.github.io/tags/hlsl/</guid>
       <description></description>
     </item>
     <item>
       <title>Maths</title>
-      <link>https://example.org/tags/maths/</link>
+      <link>https://jamesricher.github.io/tags/maths/</link>
       <pubDate>Fri, 04 Apr 2025 00:00:00 +0000</pubDate>
-      <guid>https://example.org/tags/maths/</guid>
+      <guid>https://jamesricher.github.io/tags/maths/</guid>
       <description></description>
     </item>
     <item>
       <title>Unity</title>
-      <link>https://example.org/tags/unity/</link>
+      <link>https://jamesricher.github.io/tags/unity/</link>
       <pubDate>Fri, 04 Apr 2025 00:00:00 +0000</pubDate>
-      <guid>https://example.org/tags/unity/</guid>
+      <guid>https://jamesricher.github.io/tags/unity/</guid>
       <description></description>
     </item>
   </channel>
