@@ -1,0 +1,57 @@
+baseURL: 'https://example.org/'
+languageCode: 'en-us'
+title: "James' Graphics Blog"
+theme: PaperMod
+
+caches:
+  images:
+    dir: :cacheDir/images
+
+params:
+  math: true
+  ShowPostNavLinks: true
+  ShowReadingTime: true
+  hideSummary: true
+
+  homeInfoParams:
+    Title: "Hi There!"
+    Content: "Welcome to my personal blog where I document my journey through graphics programming."
+
+  socialIcons:
+    - name: "github"
+      url: https://github.com/JamesRicher
+    - name: "email"
+      url: "mailto:richerjames@gmail.com"
+
+markup:
+  goldmark:
+    extensions:
+      passthrough:
+        delimiters:
+          block:
+            - - \[
+              - \]
+            - - $$
+              - $$
+          inline:
+            - - \(
+              - \)
+        enable: true
+
+menu:
+  main:
+    - identifier: categories
+      name: Categories
+      url: /categories/
+      weight: 1
+    - identifier: tags
+      name: Tags
+      url: /tags/
+      weight: 2
+    - identifier: archives
+      name: Archives
+      url: /archives/
+      weight: 3
+
+
+
