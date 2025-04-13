@@ -16,7 +16,7 @@ params:
 
   homeInfoParams:
     Title: "Hi There!"
-    Content: "Welcome to my personal blog where I document my journey through graphics programming."
+    Content: "Welcome to my personal blog where I document my explorations in graphics programming."
 
   socialIcons:
     - name: "github"
