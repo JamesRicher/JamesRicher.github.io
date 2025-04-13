@@ -3,9 +3,9 @@ languageCode: 'en-us'
 title: "James' Graphics Blog"
 theme: PaperMod
 
-caches:
-  images:
-    dir: :cacheDir/images
+# caches:
+#   images:
+#     dir: :cacheDir/images
 
 params:
   math: true
