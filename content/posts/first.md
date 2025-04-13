@@ -122,6 +122,8 @@ $$
 \tilde{h}_0(\mathbf{k}) = \frac{1}{\sqrt{2}}(z_r + iz_i)\sqrt{P(\mathbf{k})}
 $$
 
+Some text here
+
 {{< rawhtml >}}
     <center>
         <figure>
