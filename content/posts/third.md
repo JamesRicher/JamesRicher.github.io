@@ -6,6 +6,8 @@ params:
     math: true
 categories: ["Water Rendering"]
 
+tags: ["Unity", "HLSL", "C#", "Maths"]
+
 cover:
     image: /images/fftWater_3/ocean_512.png
     alt: 'This is a post image'

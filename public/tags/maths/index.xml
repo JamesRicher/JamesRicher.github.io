@@ -6,7 +6,7 @@
     <description>Recent content in Maths on James&#39; Graphics Blog</description>
     <generator>Hugo -- 0.145.0</generator>
     <language>en-us</language>
-    <lastBuildDate>Fri, 04 Apr 2025 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Sun, 13 Apr 2025 00:00:00 +0000</lastBuildDate>
     <atom:link href="https://jamesricher.github.io/tags/maths/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>FFT-Based Water Rendering Part 1: Building the Heightfield</title>
@@ -14,6 +14,66 @@
       <pubDate>Fri, 04 Apr 2025 00:00:00 +0000</pubDate>
       <guid>https://jamesricher.github.io/posts/first/</guid>
       <description>write a summary here</description>
+    </item>
+    <item>
+      <title>FFT-Based Water Rendering Part 2: Normals and Ocean Swell</title>
+      <link>https://jamesricher.github.io/posts/second/</link>
+      <pubDate>Tue, 08 Apr 2025 00:00:00 +0000</pubDate>
+      <guid>https://jamesricher.github.io/posts/second/</guid>
+      <description>&lt;style&gt;
+    .pixelated {
+        image-rendering: pixelated;
+    }
+
+    .smooth {
+    image-rendering: smooth;
+    }
+
+    .pixelated {
+    image-rendering: pixelated;
+    }
+
+    .crisp-edges {
+    image-rendering: crisp-edges;
+    }
+
+    figcaption {
+        font-style: italic;
+        text-align: center;
+    }
+&lt;/style&gt;
+
+&lt;p&gt;Following on from the first part in this series, we now have our ocean heightfield but no way to make out much of the wave details as we are not currently computing the surface normals. In this part, I will show how these normals can be calculated, as well as improving the waves&amp;rsquo; presentation by adding some vertex movement in the \(xz\) plane to simulate ocean swell.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>FFT-Based Water Rendering Part 3: Switching to the FFT</title>
+      <link>https://jamesricher.github.io/posts/third/</link>
+      <pubDate>Sun, 13 Apr 2025 00:00:00 +0000</pubDate>
+      <guid>https://jamesricher.github.io/posts/third/</guid>
+      <description>&lt;style&gt;
+    .pixelated {
+        image-rendering: pixelated;
+    }
+
+    .smooth {
+    image-rendering: smooth;
+    }
+
+    .pixelated {
+    image-rendering: pixelated;
+    }
+
+    .crisp-edges {
+    image-rendering: crisp-edges;
+    }
+
+    figcaption {
+        font-style: italic;
+        text-align: center;
+    }
+&lt;/style&gt;
+
+&lt;p&gt;At the moment, we have a fully functioning system for rendering our water. However, due to all of the additional DFTs we are performing to calculate our normals and displacement vectors, the simulation runs very slowly; using an \(N\) any higher than 256 results in single-digit frame rates on my machine. To remedy this and allow us to generate higher detail ocean surfaces we must replace the DFT with the much faster FFT. The particular FFT I will be implementing is the &lt;a href=&#34;https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm&#34;&gt;Cooley–Tukey FFT&lt;/a&gt;, for which we need to assume that \(N\) is always a power of two.&lt;/p&gt;</description>
     </item>
   </channel>
 </rss>

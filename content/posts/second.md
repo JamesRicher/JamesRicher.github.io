@@ -6,6 +6,8 @@ params:
     math: true
 showToc: true
 
+tags: ["Unity", "HLSL", "C#", "Maths"]
+
 cover:
     image: /images/fftWater_2/swell2.png
     alt: 'This is a post image'

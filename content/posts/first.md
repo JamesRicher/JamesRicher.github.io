@@ -2,7 +2,7 @@
 date: '2025-04-04'
 draft: false
 title: 'FFT-Based Water Rendering Part 1: Building the Heightfield'
-tags: ["Unity", "HLSL", "Maths"]
+tags: ["Unity", "HLSL", "C#", "Maths"]
 categories: ["Water Rendering"]
 
 cover:
