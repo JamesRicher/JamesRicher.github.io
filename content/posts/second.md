@@ -2,6 +2,7 @@
 date: '2025-04-08'
 draft: false
 title: 'FFT-Based Water Rendering Part 2: Normals and Ocean Swell'
+url: 'FFTWaterPart2'
 params:
     math: true
 showToc: true

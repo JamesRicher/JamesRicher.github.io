@@ -2,6 +2,7 @@
 date: '2025-04-13'
 draft: false
 title: 'FFT-Based Water Rendering Part 3: Switching to the FFT'
+url: 'FFTWaterPart3'
 params:
     math: true
 categories: ["Water Rendering"]

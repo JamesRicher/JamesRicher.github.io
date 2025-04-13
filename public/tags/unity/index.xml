@@ -10,16 +10,16 @@
     <atom:link href="https://jamesricher.github.io/tags/unity/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>FFT-Based Water Rendering Part 1: Building the Heightfield</title>
-      <link>https://jamesricher.github.io/posts/first/</link>
+      <link>https://jamesricher.github.io/FFTWaterPart1/</link>
       <pubDate>Fri, 04 Apr 2025 00:00:00 +0000</pubDate>
-      <guid>https://jamesricher.github.io/posts/first/</guid>
+      <guid>https://jamesricher.github.io/FFTWaterPart1/</guid>
       <description>write a summary here</description>
     </item>
     <item>
       <title>FFT-Based Water Rendering Part 2: Normals and Ocean Swell</title>
-      <link>https://jamesricher.github.io/posts/second/</link>
+      <link>https://jamesricher.github.io/FFTWaterPart2/</link>
       <pubDate>Tue, 08 Apr 2025 00:00:00 +0000</pubDate>
-      <guid>https://jamesricher.github.io/posts/second/</guid>
+      <guid>https://jamesricher.github.io/FFTWaterPart2/</guid>
       <description>&lt;style&gt;
     .pixelated {
         image-rendering: pixelated;
@@ -47,9 +47,9 @@
     </item>
     <item>
       <title>FFT-Based Water Rendering Part 3: Switching to the FFT</title>
-      <link>https://jamesricher.github.io/posts/third/</link>
+      <link>https://jamesricher.github.io/FFTWaterPart3/</link>
       <pubDate>Sun, 13 Apr 2025 00:00:00 +0000</pubDate>
-      <guid>https://jamesricher.github.io/posts/third/</guid>
+      <guid>https://jamesricher.github.io/FFTWaterPart3/</guid>
       <description>&lt;style&gt;
     .pixelated {
         image-rendering: pixelated;

@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>FFT-Based Water Rendering Part 3: Switching to the FFT | James&#39; Graphics Blog</title>
+<meta name="keywords" content="Unity, HLSL, C#, Maths">
+<meta name="description" content="
+
+At the moment, we have a fully functioning system for rendering our water. However, due to all of the additional DFTs we are performing to calculate our normals and displacement vectors, the simulation runs very slowly; using an \(N\) any higher than 256 results in single-digit frame rates on my machine. To remedy this and allow us to generate higher detail ocean surfaces we must replace the DFT with the much faster FFT. The particular FFT I will be implementing is the Cooley–Tukey FFT, for which we need to assume that \(N\) is always a power of two.">
+<meta name="author" content="">
+<link rel="canonical" href="https://jamesricher.github.io/FFTWaterPart3/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.f49d66caae9ea0fd43f21f29e71a8d3e284517ed770f2aa86fa012953ad3c9ef.css" integrity="sha256-9J1myq6eoP1D8h8p5xqNPihFF&#43;13Dyqob6ASlTrTye8=" rel="preload stylesheet" as="style">
+<link rel="icon" href="https://jamesricher.github.io/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="https://jamesricher.github.io/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="https://jamesricher.github.io/favicon-32x32.png">
+<link rel="apple-touch-icon" href="https://jamesricher.github.io/apple-touch-icon.png">
+<link rel="mask-icon" href="https://jamesricher.github.io/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="https://jamesricher.github.io/FFTWaterPart3/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+</noscript><meta property="og:url" content="https://jamesricher.github.io/FFTWaterPart3/">
+  <meta property="og:site_name" content="James&#39; Graphics Blog">
+  <meta property="og:title" content="FFT-Based Water Rendering Part 3: Switching to the FFT">
+  <meta property="og:description" content=" At the moment, we have a fully functioning system for rendering our water. However, due to all of the additional DFTs we are performing to calculate our normals and displacement vectors, the simulation runs very slowly; using an \(N\) any higher than 256 results in single-digit frame rates on my machine. To remedy this and allow us to generate higher detail ocean surfaces we must replace the DFT with the much faster FFT. The particular FFT I will be implementing is the Cooley–Tukey FFT, for which we need to assume that \(N\) is always a power of two.">
+  <meta property="og:locale" content="en-us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2025-04-13T00:00:00+00:00">
+    <meta property="article:modified_time" content="2025-04-13T00:00:00+00:00">
+    <meta property="article:tag" content="Unity">
+    <meta property="article:tag" content="HLSL">
+    <meta property="article:tag" content="C#">
+    <meta property="article:tag" content="Maths">
+    <meta property="og:image" content="https://jamesricher.github.io/images/fftWater_3/ocean_512.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://jamesricher.github.io/images/fftWater_3/ocean_512.png">
+<meta name="twitter:title" content="FFT-Based Water Rendering Part 3: Switching to the FFT">
+<meta name="twitter:description" content="
+
+At the moment, we have a fully functioning system for rendering our water. However, due to all of the additional DFTs we are performing to calculate our normals and displacement vectors, the simulation runs very slowly; using an \(N\) any higher than 256 results in single-digit frame rates on my machine. To remedy this and allow us to generate higher detail ocean surfaces we must replace the DFT with the much faster FFT. The particular FFT I will be implementing is the Cooley–Tukey FFT, for which we need to assume that \(N\) is always a power of two.">
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "https://jamesricher.github.io/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "FFT-Based Water Rendering Part 3: Switching to the FFT",
+      "item": "https://jamesricher.github.io/FFTWaterPart3/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "FFT-Based Water Rendering Part 3: Switching to the FFT",
+  "name": "FFT-Based Water Rendering Part 3: Switching to the FFT",
+  "description": " At the moment, we have a fully functioning system for rendering our water. However, due to all of the additional DFTs we are performing to calculate our normals and displacement vectors, the simulation runs very slowly; using an \\(N\\) any higher than 256 results in single-digit frame rates on my machine. To remedy this and allow us to generate higher detail ocean surfaces we must replace the DFT with the much faster FFT. The particular FFT I will be implementing is the Cooley–Tukey FFT, for which we need to assume that \\(N\\) is always a power of two.\n",
+  "keywords": [
+    "Unity", "HLSL", "C#", "Maths"
+  ],
+  "articleBody": " At the moment, we have a fully functioning system for rendering our water. However, due to all of the additional DFTs we are performing to calculate our normals and displacement vectors, the simulation runs very slowly; using an \\(N\\) any higher than 256 results in single-digit frame rates on my machine. To remedy this and allow us to generate higher detail ocean surfaces we must replace the DFT with the much faster FFT. The particular FFT I will be implementing is the Cooley–Tukey FFT, for which we need to assume that \\(N\\) is always a power of two.\nThe full code for this project is available at my GitHub here.\nThe 1D (Inverse) FFT To develop an understanding of how the FFT works, we first consider the one-dimensional case. As a reminder, we can write the inverse DFT of a collection \\(N\\) frequency samples, \\(F(0), \\: F(1),\\: ...\\:, \\:F(N - 1) \\) as\n$$ f(n) = \\sum_{k=0}^{N-1} f(k) \\exp(2\\pi i \\frac{kn}{N}) $$where \\(n\\) is an integer between \\(0\\) and \\(N-1\\) inclusive. This expression can be rewritten using the variable \\(W_N\\) called the “twiddle factor”, defined as\n$$ W_N = \\exp(\\frac{2\\pi i}{N}) $$The twiddle factor has a few important properties we will need to apply later:\n\\(W_N^{k+N} = W_N^k\\) \\(W_N^{k + \\frac{N}{2}} = -W_N^k\\) \\(W_N^{2k} = W_{\\frac{N}{2}}^k\\) These properties are straightforward to derive from the definition \\(W_N\\).\nInserting \\(W_N\\) into the expression for the DFT, we find that\n$$ f(n) = \\sum_{k=0}^{N-1} f(k) W_N^{kn} $$Now comes the central idea of the FFT: we can split this DFT summation into two smaller DFTs. Each DFT will be of order \\(\\frac{N}{2}\\) and run over either the odd indices or the even indices. This is done as follows:\n$$ \\begin{align} f(n) \u0026= \\sum_{k=0}^{N-1} f(k) W_N^{kn} \\\\ \u0026= \\sum_{k=0}^{\\frac{N}{2}-1} f(2k) W_N^{2kn} + \\sum_{k=0}^{\\frac{N}{2}-1} f(2k+1) W_N^{(2k + 1)n} \\\\ \u0026= \\underbrace{\\sum_{k=0}^{\\frac{N}{2}-1} f(2k) W_{\\frac{N}{2}}^{kn}}_{\\frac{N}{2} \\text{point DFT over even indices}} + W_N^n \\underbrace{\\sum_{k=0}^{\\frac{N}{2}-1} f(2k + 1) W_{\\frac{N}{2}}^{kn}}_{\\frac{N}{2} \\text{point DFT over odd indices}} \\\\ \\end{align} $$The above result is known as the Danielson-Lanczos Lemma. This exact same process can be repeated \\(\\log_2 (N) \\) times for the smaller DFTs until the overall sum is no longer reducible. How this works in practice becomes much easier to see after studying some concrete cases for small \\(N\\). The FFT then builds on itself in a very natural and modular way for larger values of \\(N\\).\nThe \\(2\\) Point FFT The most basic case of the FFT is where \\(N = 2\\), which requires only one application of the Danielson-Lanczos Lemma. We can express this DFT as:\n$$ \\begin{align} f(n) \u0026= \\sum_{k=0}^1 F(k) W_2^{kn} \\\\ \u0026= \\sum_{k=0}^0 F(2k) W_1^{kn} + W_2^n\\sum_{k=0}^0 F(2k+1) W_1^{kn} \\\\ \u0026= F(0) + W_2^nF(1) \\end{align} $$Now, substituting concrete values for \\(n\\) into the above expression and using property \\(2\\) of \\(W_N\\) we find that:\n$$ \\begin{align} \u0026 f(0) = F(0) + W_2^0F(1) = F(0) + F(1) \\\\ \u0026 f(1) = F(0) + W_2^1F(1) = F(0) - W_2^0F(1) = F(0) - F(1) \\end{align} $$Sums of the form \\(A + W_N^nB\\) are called butterfly operations and are the fundamental building blocks of the FFT. These operations are neatly expressed in butterfly diagrams. For example, the butterfly diagram for the \\(2\\) point FFT is shown below.\nButterfly diagram for \\(2\\) point FFT Butterfly diagrams can be understood as follows:\nEach value on the far left (\\(F(0) \\) and \\(F(1)\\)) represents an input to the system and enters through its own “channel”. We can think of the inputs as flowing along their channel from left to right. A number, \\(x\\), above a channel indicates that the current contents of the channel should be multiplied by \\(x\\). Whenever a channel meets an outgoing arrow, its contents are added to the channel pointed to by that arrow. The final outputs of the system are the values on the far right (\\(f(0)\\) and \\(f(1)\\)). The \\(4\\) Point FFT Scaling by a power of two, we now consider the FFT for \\(N=4\\). Applying the Danielson-Lanczos Lemma once we obtain:\n$$ \\begin{align} f(n) \u0026= \\sum_{k=0}^3 F(k) W_4^{kn} \\\\ \u0026= \\underbrace{\\sum_{k=0}^1 F(2k) W_2^{kn}}_{N=2 \\text{ DFT}} + W_4^n\\underbrace{\\sum_{k=0}^1 F(2k+1) W_2^{kn}}_{N=2 \\text{ DFT}} \\\\ \u0026= E(n) + W_4^nO(n) \\end{align} $$Therefore, the first stage of the \\(N=4\\) FFT is to solve the two \\(N=2\\) DFTs, denoted \\(E(n)\\) for the even indices and \\(O(n)\\) for the odd indices. We have just seen exactly how to evaluate the FFT for \\(N=2\\) and so can apply that same logic here twice. Expressing \\(f\\) in terms of the subexpressions \\(E\\) and \\(O\\) and applying properties \\(1\\) and \\(2\\) of \\(W_N\\) we obtain:\n$$ \\begin{align} \u0026 f(0) = E(0) + W_4^0O(0)\\\\ \u0026 f(1) = E(1) + W_4^1O(1)\\\\ \u0026 f(2) = E(0) + W_4^2O(0) = E(0) - W_4^0O(0) \\\\ \u0026 f(3) = E(1) + W_4^3O(1) = E(1) - W_4^1O(1) \\end{align} $$The butterfly diagram for this FFT is shown below.\nButterfly diagram for \\(4\\) point FFT Condensed butterfly diagram for \\(4\\) point FFT The \\(8\\) Point FFT Scaling by one final power of two, we now consider the FFT for \\(N=8\\) and proceed in exactly the same way.\n$$ \\begin{align} f(n) \u0026= \\sum_{k=0}^7 F(k) W_8^{kn} \\\\ \u0026= \\underbrace{\\sum_{k=0}^3 F(2k) W_4^{kn}}_{N=4 \\text{ DFT}} + W_8^n\\underbrace{\\sum_{k=0}^3 F(2k+1) W_4^{kn}}_{N=4 \\text{ DFT}} \\\\ \u0026= E(n) + W_8^nO(n) \\end{align} $$From the previous case, we have seen exactly how to efficiently solve the the two inner \\(N=4\\) DFTs. Again expressing \\(f\\) in terms of the subexpressions \\(E\\) and \\(O\\) (which now have a period of \\(4\\)) and applying properties \\(1\\) and \\(2\\) of \\(W_N\\) we obtain:\n$$ \\begin{align} \u0026 f(0) = E(0) + W_8^0O(0) \\\\ \u0026 f(1) = E(1) + W_8^1O(1) \\\\ \u0026 f(2) = E(2) + W_8^2O(2) \\\\ \u0026 f(3) = E(3) + W_8^3O(3) \\\\ \u0026 f(4) = E(0) + W_8^4O(0) = E(0) - W_8^0O(0)\\\\ \u0026 f(5) = E(1) + W_8^5O(1) = E(1) - W_8^1O(1) \\\\ \u0026 f(6) = E(2) + W_8^6O(2) = E(2) - W_8^2O(2) \\\\ \u0026 f(7) = E(3) + W_8^7O(3) = E(3) - W_8^3O(3) \\end{align} $$The butterfly diagram for this FFT is shown below.\nButterfly diagram for \\(8\\) point FFT Condensed butterfly diagram for \\(8\\) point FFT Bit Reversal It is is important to note that the order of the inputs to the FFT is not the original order. This is due to the way the algorithm recursively breaks down the inputs into odd and even components, effectively splitting the input samples into pairs sharing the same congruency class modulo \\(\\frac{N}{2}\\). The correct ordering can be neatly found by bit-reversing the index of each input (i.e. mirroring its binary representation) and using this reversed value as its new input index in the FFT. For example, the following is the bit-reversal table for \\(N=8\\):\nindex binary rep. reversed binary rep. new index 0 000 000 0 1 001 100 4 2 010 010 2 3 011 110 6 4 100 001 1 5 101 101 5 6 110 011 3 7 111 111 7 Implementing the 1D FFT Putting this all together, the FFT can be implemented in C# as follows:\nprivate Complex[] IFFT(Complex[] samples) { int N = samples.Length; int stages = (int)Mathf.Log(N,2); Complex[] output = BitReverseArray(samples, stages); // For each stage for (int i = 1; i \u003c= stages; i++) { int m = (int)Mathf.Pow(2f, i); Complex omegaM = Complex.CreateFromExponential(1f, 2*Mathf.PI/m); // For each group in the current stage for (int k = 0; k \u003c N; k += m) { // For each pair in the group Complex omega = Complex.CreateFromParts(1f,0f); for (int j = 0; j \u003c m/2; j++) { Complex t = omega * output[k+j + (m/2)]; Complex u = output[k+j]; output[k+j] = u + t; output[k+j + (m/2)] = u - t; omega *= omegaM; } } } return output.Select(x =\u003e x/(float)N).ToArray(); } The 2D FFT Now, moving back towards the original problem, we consider how we can apply the FFT to a 2D DFT. Taking the spatial domain to be \\(\\mathbf{x} = (x, y)\\) and the frequency domain to be \\(\\mathbf{k} = (k, j)\\), we can write and rearrange a standard 2D (inverse) DFT as follows:\n$$ \\begin{align} f(\\mathbf{x}) \u0026= \\sum_{k=0}^{N-1} \\sum_{j=0}^{N-1} f(\\mathbf{k}) \\exp (\\frac{2\\pi i}{N} \\mathbf{k} \\cdot \\mathbf{x}) \\\\ \u0026= \\sum_{k=0}^{N-1} \\sum_{j=0}^{N-1} f(k,j) \\exp (\\frac{2\\pi i}{N} (kx + jy)) \\\\ \u0026= \\sum_{k=0}^{N-1} \\sum_{j=0}^{N-1} f(k,j) \\exp (\\frac{2\\pi i}{N}kx) \\exp (\\frac{2\\pi i}{N}jy) \\\\ \u0026= \\sum_{j=0}^{N-1} \\underbrace{\\Biggl (\\sum_{k=0}^{N-1} f(k,j) \\exp (\\frac{2\\pi i}{N}kx) \\biggr)}_{N \\text{ point 1D DFT}} \\exp (\\frac{2\\pi i}{N}jy) \\end{align} $$As we can see, for each constant value of \\(j\\) the underlined term represents a standard 1D DFT in the horizontal direction which can be solved using the FFT. The outer expression can then be seen to be another series of \\(N\\) 1D DFTs, but this time in the vertical direction. This is the approach we will take to turn our spectrum texture into a heightfield, as well as to compute the normals and displacement vectors. We will proceed in three stages:\nCompute \\(N\\) FFTs, taking each row of \\(N\\) points in the spectrum texture as the inputs. Write this output to a texture. Compute \\(N\\) more FFTs, taking each column of \\(N\\) points in the output texture of step \\(1\\) as the inputs. Multiply each output pixel by either \\(1\\) or \\(-1\\) to account for the fact that our frequency domain ranges over \\(-\\frac{N}{2}\\) to \\(\\frac{N}{2} - 1\\) rather than \\(0\\) to \\(N-1\\). Also, scale the output by \\(\\frac{1}{N^2}\\) as is standard. 2D DFT step 1 2D DFT step 2 The FFT Using Compute Shaders The final hurdle to overcome in this section is how we actually implement the FFT on the GPU. This is more complicated than the CPU implementation presented earlier as, on the GPU, we must compute each output pixel in isolation. My implementation of the FFT on the GPU is an based on the implementation by Fynn-Jorin Flügge in Realtime GPGPU FFT Ocean Water Simulation.\nThe Butterfly Texture The key ingredient to the GPU FFT is the butterfly texture. For an \\(N\\) point FFT, the butterfly texture is a texture of width \\(\\log_2(N)\\) (i.e. the number of stages in the FFT) and height \\(N\\). Each pixel in this texture can be thought of as one of the \\(N\\log_2(N)\\) butterfly operations in the FFT, with the horizontal position representing the stage and the vertical position representing the channel. The contents of each pixel contain the information required to compute the corresponding butterfly operation. This information is stored in the texture’s colour channels as follows:\nred - real part of the relevant twiddle factor. green - imaginary part of the relevant twiddle factor. blue - index of the first sample. alpha - index of the second sample (the one to be multiplied by the twiddle factor). As an example, the following table represents the contents of the butterfly texture for \\(N=8\\), with each cell corresponding to a pixel as an (R, G, B, A) vector:\n(\\(-W_2^0, 3, 7\\)) (\\(-W_4^1, 5, 7\\)) (\\(-W_8^3, 3, 7\\)) (\\(W_2^0, 3, 7\\)) (\\(-W_4^0, 4, 6\\)) (\\(-W_8^2, 2, 6\\)) (\\(-W_2^0, 1, 5\\)) (\\(W_4^1, 5, 7\\)) (\\(-W_8^1, 1, 5\\)) (\\(W_2^0, 1, 5\\)) (\\(W_4^0, 4, 6\\)) (\\(-W_8^0, 0, 4\\)) (\\(-W_2^0, 2, 6\\)) (\\(-W_4^1, 1, 3\\)) (\\(W_8^3, 3, 7\\)) (\\(W_2^0, 2, 6\\)) (\\(-W_4^0, 0, 2\\)) (\\(W_8^2, 2, 6\\)) (\\(-W_2^0, 0, 4\\)) (\\(W_4^1, 1, 3\\)) (\\(W_8^1, 1, 5\\)) (\\(W_2^0, 0, 4\\)) (\\(W_4^0, 0, 2\\)) (\\(W_8^0, 0, 4\\)) Here are a couple of actual butterfly textures. It is important to note that the vertical orientation of these textures is flipped when compared to standard butterfly diagrams due to texture coordinates starting from the bottom left.\n\\(N = 32\\) butterfly texture shown at its actual resolution \\(N=128\\) butterfly texture stretched to be more readable The following is a Unity compute shader that will generate the butterfly texture for a given choice of \\(N\\):\n#pragma kernel GenerateButterflyTexture #include \"Assets/ShaderIncludes/ComplexNumbers.cginc\" RWTexture2D\u003cfloat4\u003e _butterflyTexture; StructuredBuffer\u003cint\u003e _bitReversedIndices; float _PI; // globally defined shader constant int _N; [numthreads(1,8,1)] void GenerateButterflyTexture (uint3 id : SV_DispatchThreadID) { // id.x = current stage (from zero) // id.y = current input index // ouptut (x,y) = twiddle factor, (z,w) = input indices for butterfly operation // Note: this texture is upside down when compared to conventional butterfly diagrams // Getting twiddle factors int currentStage = id.x + 1; int groupCount = _N \u003e\u003e currentStage; float k = id.y * groupCount % _N; float ang = k * 2 * _PI / (float)_N; float2 W = ComplexExp(ang); // Getting indices uint butterflySpan = (uint)pow(2, id.x); uint groupSize = (uint)pow(2, id.x + 1); bool inTopButterfly = ((id.y % groupSize) \u003c butterflySpan); bool inStageOne = id.x == 0; int2 indices = inTopButterfly ? int2(id.y, id.y + butterflySpan) : int2(id.y - butterflySpan, id.y); indices = lerp(indices, int2(_bitReversedIndices[indices.x], _bitReversedIndices[indices.y]), inStageOne); _butterflyTexture[id.xy] = float4(W.x, W.y, indices.x, indices.y); } The Butterfly Operations Using the butterfly texture, a horizontal butterfly operation can be computed as follows:\nfloat4 butterflyData = _butterflyTexture[int2(_currentStage, id.x)]; float2 W = butterflyData.xy; float2 p = _inputTexture[int2(butterflyData.z, id.y)].xy; float2 q = _inputTexture[int2(butterflyData.w, id.y)].xy; float2 output = p + ComplexMult(W,q); where _currentStage is an int representing the current FFT stage and id is an int2 representing the current pixel ID being worked on.\nAs each input element is used in two distinct butterfly calculations, we cannot overwrite it in the input texture with output. Therefore, we must write the output of a stage of the FFT to its own texture. In practice, we use two textures called _pingpong0Texture and _pingpong1Texture, one of which acts as the input and the other as the output, depending on the value of an integer _pingpong. When _pingpong == 0, _pingpong0Texture is the input and when _pingpong == 1, _pingpong1Texture is the input. The value of this parameter is flipped on the CPU after each FFT step and passed to the compute shader before it is dispatched.\nHere is a complete Unity compute shader for a horizontal butterfly operation using the pingpong textures:\n#pragma kernel HorizontalButterfly #include \"Assets/ShaderIncludes/ComplexNumbers.cginc\" Texture2D\u003cfloat4\u003e _butterflyTexture; RWTexture2D\u003cfloat4\u003e _pingpong0Texture; RWTexture2D\u003cfloat4\u003e _pingpong1Texture; int _N; float _PI; int _currentStage; int _pingpong; [numthreads(8,8,1)] void HorizontalButterfly(uint3 id : SV_DispatchThreadID) { float4 butterflyData = _butterflyTexture[int2(_currentStage, id.x)]; float2 W = butterflyData.xy; if (_pingpong == 0) { float2 p = _pingpong0Texture[int2(butterflyData.z, id.y)].xy; float2 q = _pingpong0Texture[int2(butterflyData.w, id.y)].xy; float2 output = p + ComplexMult(W,q); _pingpong1Texture[id.xy] = float4(output.x, output.y, 0, 0); } else { float2 p = _pingpong1Texture[int2(butterflyData.z, id.y)].xy; float2 q = _pingpong1Texture[int2(butterflyData.w, id.y)].xy; float2 output = p + ComplexMult(W,q); _pingpong0Texture[id.xy] = float4(output.x, output.y, 0, 0); } } Permuting and Scaling The final step in the FFT is to permute the output to reflect the fact that our frequency domain centred about zero, rather than starting from zero. What we are calculating at the moment is\n$$ \\begin{align} \u0026 \\sum_{k=0}^{N-1} \\sum_{j=0}^{N-1} f(\\mathbf{k}) \\exp (\\frac{2\\pi i}{N} \\mathbf{k} \\cdot \\mathbf{x}) \\\\ \u0026= \\sum_{k=0}^{N-1} \\sum_{j=0}^{N-1} f(\\mathbf{k}) \\exp (\\frac{2\\pi i}{N}kx)\\exp (\\frac{2\\pi i}{N}jy) \\end{align} $$Rearranging this into the desired form we obtain:\n$$ \\begin{align} \u0026 \\sum_{k=0}^{N-1} \\sum_{j=0}^{N-1} f(\\mathbf{k}) \\exp (\\frac{2\\pi i}{N}kx)\\exp (\\frac{2\\pi i}{N}jy)\\\\ \u0026= \\sum_{k=-\\frac{N}{2}}^{\\frac{N}{2}-1} \\sum_{j=-\\frac{N}{2}}^{\\frac{N}{2}-1} f(\\mathbf{k}) \\exp (\\frac{2\\pi i}{N}(k+ \\frac{N}{2})x)\\exp (\\frac{2\\pi i}{N}(j + \\frac{N}{2})y) \\\\ \u0026= \\exp(\\pi i)^x \\exp(\\pi i)^y \\sum_{k=-\\frac{N}{2}}^{\\frac{N}{2}-1} \\sum_{j=-\\frac{N}{2}}^{\\frac{N}{2}-1} f(\\mathbf{k}) \\exp (\\frac{2\\pi i}{N}kx)\\exp (\\frac{2\\pi i}{N}jy) \\\\ \u0026= (-1)^{x+y} \\sum_{k=-\\frac{N}{2}}^{\\frac{N}{2}-1} \\sum_{j=-\\frac{N}{2}}^{\\frac{N}{2}-1} f(\\mathbf{k}) \\exp (\\frac{2\\pi i}{N}kx)\\exp (\\frac{2\\pi i}{N}jy) \\\\ \\end{align} $$(Note that the argument \\(\\mathbf{k}\\) of \\(f\\) does not change in the above expression as this argument is purely symbolic). Therefore, to obtain the final heightfield, we must multiply each pixel output by \\((-1)^{x+y}\\) where \\(x\\) and \\(y\\) are the pixel’s ID. At this stage we also scale the output by the standard normalisation factor \\(\\frac{1}{N^2}\\).\nPutting it All Together With all of the elements of our FFT written, we can now put them together in C#. We dispatch the horizontal butterfly compute shader \\(\\log_2(N)\\) times to complete the \\(N\\) horizontal FFTs, setting the stage and pingpong variables before each dispatch. We then do the same in the vertical direction using the vertical butterfly compute shader. The output of this is then permuted and scaled to create the final output texture.\nThis can be implemented in C# as follows:\npublic void IFFT2D(RenderTexture input, RenderTexture output) { _pingpong = 0; Graphics.Blit(input, _pingpong0RT); for (int i = 0; i \u003c _totalStages; i++) { _fftCompute.SetInt(\"_currentStage\", i); _fftCompute.SetInt(\"_pingpong\", _pingpong); _fftCompute.Dispatch(_horButterflyKernelID, _workGroupCount, _workGroupCount, 1); _pingpong = (_pingpong + 1) % 2; } for (int i = 0; i \u003c _totalStages; i++) { _fftCompute.SetInt(\"_currentStage\", i); _fftCompute.SetInt(\"_pingpong\", _pingpong); _fftCompute.Dispatch(_verButterflyKernelID, _workGroupCount, _workGroupCount, 1); _pingpong = (_pingpong + 1) % 2; } _permuteAndScaleCompute.SetTexture(_permuteAndScaleKernelID, \"_outputTexture\", output); _permuteAndScaleCompute.Dispatch(_permuteAndScaleKernelID, _workGroupCount, _workGroupCount, 1); } Rendering With Higher \\(N\\) Making the jump from the DFT to the FFT, we can now render the water’s surface at higher resolutions, being able to push \\(N\\) up to \\(1024\\) on my machine. The original DFT implementation required approximately \\(N^2\\) operations to compute the heightfield, which for \\(N= 1024\\) means \\(1048576\\) total operations. The FFT on the other hand requires approximately \\(N\\log_2(N)\\) operations, which for the same value of \\(N\\) means only \\(10240\\) total operations. As a result, for \\(N=1024\\) the FFT is over \\(100\\) times faster than the DFT. Ocean surface using \\(N=1024\\) References Fynn-Jorin Flügge: Realtime GPGPU FFT Ocean Water Simulation Always Learn: A DFT and FFT Tutorial Ronald N. Bracewell: The Fourier Transform and its Applications (book) ",
+  "wordCount" : "2827",
+  "inLanguage": "en",
+  "image":"https://jamesricher.github.io/images/fftWater_3/ocean_512.png","datePublished": "2025-04-13T00:00:00Z",
+  "dateModified": "2025-04-13T00:00:00Z",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://jamesricher.github.io/FFTWaterPart3/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "James' Graphics Blog",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://jamesricher.github.io/favicon.ico"
+    }
+  }
+}
+</script>
+    
+        <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<script>
+  MathJax = {
+    tex: {
+      displayMath: [['\\[', '\\]'], ['$$', '$$']],  
+      inlineMath: [['\\(', '\\)']]                  
+    },
+    loader:{
+      load: ['ui/safe']
+    },
+  };
+</script>
+    
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="https://jamesricher.github.io/" accesskey="h" title="James&#39; Graphics Blog (Alt + H)">James&#39; Graphics Blog</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)" aria-label="Toggle theme">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="https://jamesricher.github.io/categories/" title="Categories">
+                    <span>Categories</span>
+                </a>
+            </li>
+            <li>
+                <a href="https://jamesricher.github.io/tags/" title="Tags">
+                    <span>Tags</span>
+                </a>
+            </li>
+            <li>
+                <a href="https://jamesricher.github.io/archives/" title="Archives">
+                    <span>Archives</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title entry-hint-parent">
+      FFT-Based Water Rendering Part 3: Switching to the FFT
+    </h1>
+    <div class="post-meta"><span title='2025-04-13 00:00:00 +0000 UTC'>April 13, 2025</span>&nbsp;·&nbsp;14 min
+
+</div>
+  </header> 
+<figure class="entry-cover">
+        <img loading="eager" src="https://jamesricher.github.io/images/fftWater_3/ocean_512.png" alt="This is a post image">
+        
+</figure><div class="toc">
+    <details >
+        <summary accesskey="c" title="(Alt + C)">
+            <span class="details">Table of Contents</span>
+        </summary>
+
+        <div class="inner"><ul>
+                <li>
+                    <a href="#the-1d-inverse-fft" aria-label="The 1D (Inverse) FFT">The 1D (Inverse) FFT</a><ul>
+                        
+                <li>
+                    <a href="#the--point-fft" aria-label="The \(2\) Point FFT">The \(2\) Point FFT</a></li>
+                <li>
+                    <a href="#the--point-fft-1" aria-label="The \(4\) Point FFT">The \(4\) Point FFT</a></li>
+                <li>
+                    <a href="#the--point-fft-2" aria-label="The \(8\) Point FFT">The \(8\) Point FFT</a></li>
+                <li>
+                    <a href="#bit-reversal" aria-label="Bit Reversal">Bit Reversal</a></li></ul>
+                </li>
+                <li>
+                    <a href="#implementing-the-1d-fft" aria-label="Implementing the 1D FFT">Implementing the 1D FFT</a></li>
+                <li>
+                    <a href="#the-2d-fft" aria-label="The 2D FFT">The 2D FFT</a></li>
+                <li>
+                    <a href="#the-fft-using-compute-shaders" aria-label="The FFT Using Compute Shaders">The FFT Using Compute Shaders</a><ul>
+                        
+                <li>
+                    <a href="#the-butterfly-texture" aria-label="The Butterfly Texture">The Butterfly Texture</a></li>
+                <li>
+                    <a href="#the-butterfly-operations" aria-label="The Butterfly Operations">The Butterfly Operations</a></li>
+                <li>
+                    <a href="#permuting-and-scaling" aria-label="Permuting and Scaling">Permuting and Scaling</a></li>
+                <li>
+                    <a href="#putting-it-all-together" aria-label="Putting it All Together">Putting it All Together</a></li></ul>
+                </li>
+                <li>
+                    <a href="#rendering-with-higher" aria-label="Rendering With Higher \(N\)">Rendering With Higher \(N\)</a></li>
+                <li>
+                    <a href="#references" aria-label="References">References</a>
+                </li>
+            </ul>
+        </div>
+    </details>
+</div>
+
+  <div class="post-content">
+
+<style>
+    .pixelated {
+        image-rendering: pixelated;
+    }
+
+    .smooth {
+    image-rendering: smooth;
+    }
+
+    .pixelated {
+    image-rendering: pixelated;
+    }
+
+    .crisp-edges {
+    image-rendering: crisp-edges;
+    }
+
+    figcaption {
+        font-style: italic;
+        text-align: center;
+    }
+</style>
+
+<p>At the moment, we have a fully functioning system for rendering our water. However, due to all of the additional DFTs we are performing to calculate our normals and displacement vectors, the simulation runs very slowly; using an \(N\) any higher than 256 results in single-digit frame rates on my machine. To remedy this and allow us to generate higher detail ocean surfaces we must replace the DFT with the much faster FFT. The particular FFT I will be implementing is the <a href="https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm">Cooley–Tukey FFT</a>, for which we need to assume that \(N\) is always a power of two.</p>
+<p>The full code for this project is available at my GitHub <a href="https://github.com/JamesRicher/UnityFFTOcean">here</a>.</p>
+<h2 id="the-1d-inverse-fft">The 1D (Inverse) FFT<a hidden class="anchor" aria-hidden="true" href="#the-1d-inverse-fft">#</a></h2>
+<p>To develop an understanding of how the FFT works, we first consider the one-dimensional case. As a reminder, we can write the inverse DFT of a collection \(N\) frequency samples, \(F(0), \: F(1),\: ...\:, \:F(N - 1) \) as</p>
+$$
+f(n) = \sum_{k=0}^{N-1} f(k) \exp(2\pi i \frac{kn}{N})
+$$<p>where \(n\) is an integer between \(0\) and \(N-1\) inclusive. This expression can be rewritten using the variable \(W_N\) called the &ldquo;twiddle factor&rdquo;, defined as</p>
+$$
+W_N = \exp(\frac{2\pi i}{N})
+$$<p>The twiddle factor has a few important properties we will need to apply later:</p>
+<ol>
+<li>\(W_N^{k+N} = W_N^k\)</li>
+<li>\(W_N^{k + \frac{N}{2}} = -W_N^k\)</li>
+<li>\(W_N^{2k} = W_{\frac{N}{2}}^k\)</li>
+</ol>
+<p>These properties are straightforward to derive from the definition \(W_N\).</p>
+<p>Inserting \(W_N\) into the expression for the DFT, we find that</p>
+$$
+f(n) = \sum_{k=0}^{N-1} f(k) W_N^{kn}
+$$<p>Now comes the central idea of the FFT: we can split this DFT summation into two smaller DFTs. Each DFT will be of order \(\frac{N}{2}\) and run over either the odd indices or the even indices. This is done as follows:</p>
+$$
+\begin{align}
+    f(n) &= \sum_{k=0}^{N-1} f(k) W_N^{kn} \\
+    &= \sum_{k=0}^{\frac{N}{2}-1} f(2k) W_N^{2kn} + \sum_{k=0}^{\frac{N}{2}-1} f(2k+1) W_N^{(2k + 1)n} \\
+    &= \underbrace{\sum_{k=0}^{\frac{N}{2}-1} f(2k) W_{\frac{N}{2}}^{kn}}_{\frac{N}{2} \text{point DFT over even indices}} 
+    + W_N^n \underbrace{\sum_{k=0}^{\frac{N}{2}-1} f(2k + 1) W_{\frac{N}{2}}^{kn}}_{\frac{N}{2} \text{point DFT over odd indices}} \\
+\end{align}
+$$<p>The above result is known as the <strong>Danielson-Lanczos Lemma</strong>. This exact same process can be repeated \(\log_2 (N) \) times for the smaller DFTs until the overall sum is no longer reducible. How this works in practice becomes much easier to see after studying some concrete cases for small \(N\). The FFT then builds on itself in a very natural and modular way for larger values of \(N\).</p>
+<h3 id="the--point-fft">The \(2\) Point FFT<a hidden class="anchor" aria-hidden="true" href="#the--point-fft">#</a></h3>
+<p>The most basic case of the FFT is where \(N = 2\), which requires only one application of the Danielson-Lanczos Lemma. We can express this DFT as:</p>
+$$
+\begin{align}
+    f(n) &= \sum_{k=0}^1 F(k) W_2^{kn} \\
+    &= \sum_{k=0}^0 F(2k) W_1^{kn} + W_2^n\sum_{k=0}^0 F(2k+1) W_1^{kn} \\
+    &= F(0) + W_2^nF(1)
+\end{align}
+$$<p>Now, substituting concrete values for \(n\) into the above expression and using property \(2\) of \(W_N\) we find that:</p>
+$$
+\begin{align}
+    & f(0) = F(0) + W_2^0F(1) = F(0) + F(1) \\
+    & f(1) = F(0) + W_2^1F(1) = F(0) - W_2^0F(1) = F(0) - F(1) 
+\end{align}
+$$<p>Sums of the form \(A + W_N^nB\) are called <strong>butterfly operations</strong> and are the fundamental building blocks of the FFT. These operations are neatly expressed in <strong>butterfly diagrams</strong>. For example, the butterfly diagram for the \(2\) point FFT is shown below.</p>
+
+
+    <center>
+        <figure>
+            <img class="smooth" src="/images/fftWater_3/FFT_2.jpeg" alt="drawing" width="600"/>
+            <figcaption>Butterfly diagram for \(2\) point FFT</figcaption>
+        </figure>
+    </center>
+
+<p>Butterfly diagrams can be understood as follows:</p>
+<ul>
+<li>Each value on the far left (\(F(0) \) and \(F(1)\)) represents an input to the system and enters through its own &ldquo;channel&rdquo;. We can think of the inputs as flowing along their channel from left to right.</li>
+<li>A number, \(x\), above a channel indicates that the current contents of the channel should be multiplied by \(x\).</li>
+<li>Whenever a channel meets an outgoing arrow, its contents are added to the channel pointed to by that arrow.</li>
+<li>The final outputs of the system are the values on the far right (\(f(0)\) and \(f(1)\)).</li>
+</ul>
+<h3 id="the--point-fft-1">The \(4\) Point FFT<a hidden class="anchor" aria-hidden="true" href="#the--point-fft-1">#</a></h3>
+<p>Scaling by a power of two, we now consider the FFT for \(N=4\). Applying the Danielson-Lanczos Lemma once we obtain:</p>
+$$
+\begin{align}
+    f(n) &= \sum_{k=0}^3 F(k) W_4^{kn} \\
+    &= \underbrace{\sum_{k=0}^1 F(2k) W_2^{kn}}_{N=2 \text{ DFT}} + W_4^n\underbrace{\sum_{k=0}^1 F(2k+1) W_2^{kn}}_{N=2 \text{ DFT}} \\
+    &= E(n) + W_4^nO(n)
+\end{align}
+$$<p>Therefore, the first stage of the \(N=4\) FFT is to solve the two \(N=2\) DFTs, denoted \(E(n)\) for the even indices and \(O(n)\) for the odd indices. We have just seen exactly how to evaluate the FFT for \(N=2\) and so can apply that same logic here twice. Expressing \(f\) in terms of the subexpressions \(E\) and \(O\) and applying properties \(1\) and \(2\) of \(W_N\) we obtain:</p>
+$$
+\begin{align}
+    & f(0) = E(0) + W_4^0O(0)\\
+    & f(1) = E(1) + W_4^1O(1)\\
+    & f(2) = E(0) + W_4^2O(0) = E(0) - W_4^0O(0) \\
+    & f(3) = E(1) + W_4^3O(1) = E(1) - W_4^1O(1) 
+\end{align}
+$$<p>The butterfly diagram for this FFT is shown below.</p>
+
+
+    <center>
+        <figure>
+            <img class="smooth" src="/images/fftWater_3/FFT_4.jpeg" alt="drawing" width="700"/>
+            <figcaption>Butterfly diagram for \(4\) point FFT</figcaption>
+        </figure>
+    </center>
+
+
+
+    <center>
+        <figure>
+            <img class="smooth" src="/images/fftWater_3/FFT_4_Condensed.jpeg" alt="drawing" width="700"/>
+            <figcaption>Condensed butterfly diagram for \(4\) point FFT</figcaption>
+        </figure>
+    </center>
+
+<h3 id="the--point-fft-2">The \(8\) Point FFT<a hidden class="anchor" aria-hidden="true" href="#the--point-fft-2">#</a></h3>
+<p>Scaling by one final power of two, we now consider the FFT for \(N=8\) and proceed in exactly the same way.</p>
+$$
+\begin{align}
+    f(n) &= \sum_{k=0}^7 F(k) W_8^{kn} \\
+    &= \underbrace{\sum_{k=0}^3 F(2k) W_4^{kn}}_{N=4 \text{ DFT}} + W_8^n\underbrace{\sum_{k=0}^3 F(2k+1) W_4^{kn}}_{N=4 \text{ DFT}} \\
+    &= E(n) + W_8^nO(n)
+\end{align}
+$$<p>From the previous case, we have seen exactly how to efficiently solve the the two inner \(N=4\) DFTs. Again expressing \(f\) in terms of the subexpressions \(E\) and \(O\) (which now have a period of \(4\)) and applying properties \(1\) and \(2\) of \(W_N\) we obtain:</p>
+$$
+\begin{align}
+    & f(0) = E(0) + W_8^0O(0) \\
+    & f(1) = E(1) + W_8^1O(1) \\
+    & f(2) = E(2) + W_8^2O(2) \\
+    & f(3) = E(3) + W_8^3O(3) \\
+    & f(4) = E(0) + W_8^4O(0) = E(0) - W_8^0O(0)\\
+    & f(5) = E(1) + W_8^5O(1) = E(1) - W_8^1O(1) \\
+    & f(6) = E(2) + W_8^6O(2) = E(2) - W_8^2O(2) \\
+    & f(7) = E(3) + W_8^7O(3) = E(3) - W_8^3O(3)
+\end{align}
+$$<p>The butterfly diagram for this FFT is shown below.</p>
+
+
+    <center>
+        <figure>
+            <img class="smooth" src="/images/fftWater_3/FFT_8.jpeg" alt="drawing" width="700"/>
+            <figcaption>Butterfly diagram for \(8\) point FFT</figcaption>
+        </figure>
+    </center>
+
+
+
+    <center>
+        <figure>
+            <img class="smooth" src="/images/fftWater_3/FFT_8_Condensed.jpeg" alt="drawing" width="700"/>
+            <figcaption>Condensed butterfly diagram for \(8\) point FFT</figcaption>
+        </figure>
+    </center>
+
+<h3 id="bit-reversal">Bit Reversal<a hidden class="anchor" aria-hidden="true" href="#bit-reversal">#</a></h3>
+<p>It is is important to note that the order of the inputs to the FFT is not the original order. This is due to the way the algorithm recursively breaks down the inputs into odd and even components, effectively splitting the input samples into pairs sharing the same congruency class modulo \(\frac{N}{2}\). The correct ordering can be neatly found by bit-reversing the index of each input (i.e. mirroring its binary representation) and using this reversed value as its new input index in the FFT. For example, the following is the bit-reversal table for \(N=8\):</p>
+<table>
+  <thead>
+      <tr>
+          <th>index</th>
+          <th>binary rep.</th>
+          <th>reversed binary rep.</th>
+          <th>new index</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>0</td>
+          <td>000</td>
+          <td>000</td>
+          <td>0</td>
+      </tr>
+      <tr>
+          <td>1</td>
+          <td>001</td>
+          <td>100</td>
+          <td>4</td>
+      </tr>
+      <tr>
+          <td>2</td>
+          <td>010</td>
+          <td>010</td>
+          <td>2</td>
+      </tr>
+      <tr>
+          <td>3</td>
+          <td>011</td>
+          <td>110</td>
+          <td>6</td>
+      </tr>
+      <tr>
+          <td>4</td>
+          <td>100</td>
+          <td>001</td>
+          <td>1</td>
+      </tr>
+      <tr>
+          <td>5</td>
+          <td>101</td>
+          <td>101</td>
+          <td>5</td>
+      </tr>
+      <tr>
+          <td>6</td>
+          <td>110</td>
+          <td>011</td>
+          <td>3</td>
+      </tr>
+      <tr>
+          <td>7</td>
+          <td>111</td>
+          <td>111</td>
+          <td>7</td>
+      </tr>
+  </tbody>
+</table>
+<h2 id="implementing-the-1d-fft">Implementing the 1D FFT<a hidden class="anchor" aria-hidden="true" href="#implementing-the-1d-fft">#</a></h2>
+<p>Putting this all together, the FFT can be implemented in C# as follows:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cs" data-lang="cs"><span style="display:flex;"><span><span style="color:#66d9ef">private</span> Complex[] IFFT(Complex[] samples)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> N = samples.Length;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> stages = (<span style="color:#66d9ef">int</span>)Mathf.Log(N,<span style="color:#ae81ff">2</span>);
+</span></span><span style="display:flex;"><span>    Complex[] output = BitReverseArray(samples, stages);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// For each stage</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> (<span style="color:#66d9ef">int</span> i = <span style="color:#ae81ff">1</span>; i &lt;= stages; i++)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">int</span> m = (<span style="color:#66d9ef">int</span>)Mathf.Pow(<span style="color:#ae81ff">2f</span>, i);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        Complex omegaM = Complex.CreateFromExponential(<span style="color:#ae81ff">1f</span>, <span style="color:#ae81ff">2</span>*Mathf.PI/m);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// For each group in the current stage</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">for</span> (<span style="color:#66d9ef">int</span> k = <span style="color:#ae81ff">0</span>; k &lt; N; k += m)
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// For each pair in the group</span>
+</span></span><span style="display:flex;"><span>            Complex omega = Complex.CreateFromParts(<span style="color:#ae81ff">1f</span>,<span style="color:#ae81ff">0f</span>);
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">for</span> (<span style="color:#66d9ef">int</span> j = <span style="color:#ae81ff">0</span>; j &lt; m/<span style="color:#ae81ff">2</span>; j++)
+</span></span><span style="display:flex;"><span>            {
+</span></span><span style="display:flex;"><span>                Complex t = omega * output[k+j + (m/<span style="color:#ae81ff">2</span>)];
+</span></span><span style="display:flex;"><span>                Complex u = output[k+j];
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>                output[k+j] = u + t;
+</span></span><span style="display:flex;"><span>                output[k+j + (m/<span style="color:#ae81ff">2</span>)] = u - t;
+</span></span><span style="display:flex;"><span>                omega *= omegaM;
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> output.Select(x =&gt; x/(<span style="color:#66d9ef">float</span>)N).ToArray();
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h2 id="the-2d-fft">The 2D FFT<a hidden class="anchor" aria-hidden="true" href="#the-2d-fft">#</a></h2>
+<p>Now, moving back towards the original problem, we consider how we can apply the FFT to a 2D DFT. Taking the spatial domain to be \(\mathbf{x} = (x, y)\) and the frequency domain to be \(\mathbf{k} = (k, j)\), we can write and rearrange a standard 2D (inverse) DFT as follows:</p>
+$$
+\begin{align}
+    f(\mathbf{x}) &= \sum_{k=0}^{N-1} \sum_{j=0}^{N-1} f(\mathbf{k}) \exp (\frac{2\pi i}{N} \mathbf{k} \cdot \mathbf{x}) \\
+    &= \sum_{k=0}^{N-1} \sum_{j=0}^{N-1} f(k,j) \exp (\frac{2\pi i}{N} (kx + jy)) \\
+    &= \sum_{k=0}^{N-1} \sum_{j=0}^{N-1} f(k,j) \exp (\frac{2\pi i}{N}kx) \exp (\frac{2\pi i}{N}jy) \\
+    &= \sum_{j=0}^{N-1} \underbrace{\Biggl (\sum_{k=0}^{N-1} f(k,j) \exp (\frac{2\pi i}{N}kx) \biggr)}_{N \text{ point 1D DFT}}  \exp (\frac{2\pi i}{N}jy) 
+\end{align}
+$$<p>As we can see, for each constant value of \(j\) the underlined term represents a standard 1D DFT in the horizontal direction which can be solved using the FFT. The outer expression can then be seen to be another series of \(N\) 1D DFTs, but this time in the vertical direction. This is the approach we will take to turn our spectrum texture into a heightfield, as well as to compute the normals and displacement vectors. We will proceed in three stages:</p>
+<ol>
+<li>Compute \(N\) FFTs, taking each row of \(N\) points in the spectrum texture as the inputs. Write this output to a texture.</li>
+<li>Compute \(N\) more FFTs, taking each column of \(N\) points in the output texture of step \(1\) as the inputs.</li>
+<li>Multiply each output pixel by either \(1\) or \(-1\) to account for the fact that our frequency domain ranges over \(-\frac{N}{2}\) to \(\frac{N}{2} - 1\) rather than \(0\) to \(N-1\). Also, scale the output by \(\frac{1}{N^2}\) as is standard.</li>
+</ol>
+
+
+    <center>
+        <figure>
+            <img class="smooth" src="/images/fftWater_3/FFT_Step1.png" alt="drawing" width="500"/>
+            <figcaption>2D DFT step 1</figcaption>
+        </figure>
+    </center>
+
+
+
+    <center>
+        <figure>
+            <img class="smooth" src="/images/fftWater_3/FFT_Step2.png" alt="drawing" width="500"/>
+            <figcaption>2D DFT step 2</figcaption>
+        </figure>
+    </center>
+
+<h2 id="the-fft-using-compute-shaders">The FFT Using Compute Shaders<a hidden class="anchor" aria-hidden="true" href="#the-fft-using-compute-shaders">#</a></h2>
+<p>The final hurdle to overcome in this section is how we actually implement the FFT on the GPU. This is more complicated than the CPU implementation presented earlier as, on the GPU, we must compute each output pixel in isolation. My implementation of the FFT on the GPU is an based on the implementation by Fynn-Jorin Flügge in <a href="https://www.google.com/search?client=safari&amp;rls=en&amp;q=Realtime+GPGPU+FFT+Ocean+Water+Simulation&amp;ie=UTF-8&amp;oe=UTF-8&amp;safe=active">Realtime GPGPU FFT Ocean Water Simulation</a>.</p>
+<h3 id="the-butterfly-texture">The Butterfly Texture<a hidden class="anchor" aria-hidden="true" href="#the-butterfly-texture">#</a></h3>
+<p>The key ingredient to the GPU FFT is the <strong>butterfly texture</strong>. For an \(N\) point FFT, the butterfly texture is a texture of width \(\log_2(N)\) (i.e. the number of stages in the FFT) and height \(N\). Each pixel in this texture can be thought of as one of the \(N\log_2(N)\) butterfly operations in the FFT, with the horizontal position representing the stage and the vertical position representing the channel. The contents of each pixel contain the information required to compute the corresponding butterfly operation. This information is stored in the texture&rsquo;s colour channels as follows:</p>
+<ul>
+<li>red - real part of the relevant twiddle factor.</li>
+<li>green - imaginary part of the relevant twiddle factor.</li>
+<li>blue - index of the first sample.</li>
+<li>alpha - index of the second sample (the one to be multiplied by the twiddle factor).</li>
+</ul>
+<p>As an example, the following table represents the contents of the butterfly texture for \(N=8\), with each cell corresponding to a pixel as an (R, G, B, A) vector:</p>
+
+
+    <table>
+        <tr>
+            <td>(\(-W_2^0, 3, 7\))</td>
+            <td>(\(-W_4^1, 5, 7\))</td>
+            <td>(\(-W_8^3, 3, 7\))</td>
+        </tr>
+        <tr>
+            <td>(\(W_2^0, 3, 7\))</td>
+            <td>(\(-W_4^0, 4, 6\))</td>
+            <td>(\(-W_8^2, 2, 6\))</td>
+        </tr>
+        <tr>
+            <td>(\(-W_2^0, 1, 5\))</td>
+            <td>(\(W_4^1, 5, 7\))</td>
+            <td>(\(-W_8^1, 1, 5\))</td>
+        </tr>
+        <tr>
+            <td>(\(W_2^0, 1, 5\))</td>
+            <td>(\(W_4^0, 4, 6\))</td>
+            <td>(\(-W_8^0, 0, 4\))</td>
+        </tr>
+        <tr>
+            <td>(\(-W_2^0, 2, 6\))</td>
+            <td>(\(-W_4^1, 1, 3\))</td>
+            <td>(\(W_8^3, 3, 7\))</td>
+        </tr>
+        <tr>
+            <td>(\(W_2^0, 2, 6\))</td>
+            <td>(\(-W_4^0, 0, 2\))</td>
+            <td>(\(W_8^2, 2, 6\))</td>
+        </tr>
+        <tr>
+            <td>(\(-W_2^0, 0, 4\))</td>
+            <td>(\(W_4^1, 1, 3\))</td>
+            <td>(\(W_8^1, 1, 5\))</td>
+        </tr>
+        <tr>
+            <td>(\(W_2^0, 0, 4\))</td>
+            <td>(\(W_4^0, 0, 2\))</td>
+            <td>(\(W_8^0, 0, 4\))</td>
+        </tr>
+    </table>
+
+<p>Here are a couple of actual butterfly textures. It is important to note that the vertical orientation of these textures is flipped when compared to standard butterfly diagrams due to texture coordinates starting from the bottom left.</p>
+
+
+    <center>
+        <figure>
+            <img class="pixelated" src="/images/fftWater_3/butterfly_32.png" alt="drawing" width="90"/>
+            <figcaption>\(N = 32\) butterfly texture shown at its actual resolution</figcaption>
+        </figure>
+    </center>
+
+
+
+    <center>
+        <figure>
+            <img class="pixelated" src="/images/fftWater_3/butterfly_128_stretched.png" alt="drawing" width="500"/>
+            <figcaption>\(N=128\) butterfly texture stretched to be more readable</figcaption>
+        </figure>
+    </center>
+
+<p>The following is a Unity compute shader that will generate the butterfly texture for a given choice of \(N\):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-hlsl" data-lang="hlsl"><span style="display:flex;"><span><span style="color:#75715e">#pragma kernel GenerateButterflyTexture</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#include &#34;Assets/ShaderIncludes/ComplexNumbers.cginc&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">RWTexture2D</span><span style="color:#f92672">&lt;</span><span style="color:#66d9ef">float4</span><span style="color:#f92672">&gt;</span> _butterflyTexture;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">StructuredBuffer</span><span style="color:#f92672">&lt;</span><span style="color:#66d9ef">int</span><span style="color:#f92672">&gt;</span> _bitReversedIndices;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">float</span> _PI; <span style="color:#75715e">// globally defined shader constant</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> _N;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>[<span style="color:#a6e22e">numthreads</span>(<span style="color:#ae81ff">1</span>,<span style="color:#ae81ff">8</span>,<span style="color:#ae81ff">1</span>)]
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> GenerateButterflyTexture (<span style="color:#66d9ef">uint3</span> id <span style="color:#f92672">:</span> <span style="color:#a6e22e">SV_DispatchThreadID</span>)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// id.x = current stage (from zero)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// id.y = current input index</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// ouptut (x,y) = twiddle factor, (z,w) = input indices for butterfly operation</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// Note: this texture is upside down when compared to conventional butterfly diagrams</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// Getting twiddle factors</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> currentStage <span style="color:#f92672">=</span> id.x <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> groupCount <span style="color:#f92672">=</span> _N <span style="color:#f92672">&gt;&gt;</span> currentStage;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">float</span> k <span style="color:#f92672">=</span> id.y <span style="color:#f92672">*</span> groupCount <span style="color:#f92672">%</span> _N;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">float</span> ang <span style="color:#f92672">=</span> k <span style="color:#f92672">*</span> <span style="color:#ae81ff">2</span> <span style="color:#f92672">*</span> _PI <span style="color:#f92672">/</span> (<span style="color:#66d9ef">float</span>)_N;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">float2</span> W <span style="color:#f92672">=</span> ComplexExp(ang);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// Getting indices </span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint</span> butterflySpan <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint</span>)pow(<span style="color:#ae81ff">2</span>, id.x);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint</span> groupSize <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint</span>)pow(<span style="color:#ae81ff">2</span>, id.x <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">bool</span> inTopButterfly <span style="color:#f92672">=</span> ((id.y <span style="color:#f92672">%</span> groupSize) <span style="color:#f92672">&lt;</span> butterflySpan);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">bool</span> inStageOne <span style="color:#f92672">=</span> id.x <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int2</span> indices <span style="color:#f92672">=</span> inTopButterfly <span style="color:#f92672">?</span> <span style="color:#66d9ef">int2</span>(id.y, id.y <span style="color:#f92672">+</span> butterflySpan) <span style="color:#f92672">:</span> <span style="color:#66d9ef">int2</span>(id.y <span style="color:#f92672">-</span> butterflySpan, id.y);
+</span></span><span style="display:flex;"><span>    indices <span style="color:#f92672">=</span> lerp(indices, <span style="color:#66d9ef">int2</span>(_bitReversedIndices[indices.x], _bitReversedIndices[indices.y]), inStageOne);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    _butterflyTexture[id.xy] <span style="color:#f92672">=</span> <span style="color:#66d9ef">float4</span>(W.x, W.y, indices.x, indices.y);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="the-butterfly-operations">The Butterfly Operations<a hidden class="anchor" aria-hidden="true" href="#the-butterfly-operations">#</a></h3>
+<p>Using the butterfly texture, a horizontal butterfly operation can be computed as follows:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-hlsl" data-lang="hlsl"><span style="display:flex;"><span><span style="color:#66d9ef">float4</span> butterflyData <span style="color:#f92672">=</span> _butterflyTexture[<span style="color:#66d9ef">int2</span>(_currentStage, id.x)];
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">float2</span> W <span style="color:#f92672">=</span> butterflyData.xy;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">float2</span> p <span style="color:#f92672">=</span> _inputTexture[<span style="color:#66d9ef">int2</span>(butterflyData.z, id.y)].xy;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">float2</span> q <span style="color:#f92672">=</span> _inputTexture[<span style="color:#66d9ef">int2</span>(butterflyData.w, id.y)].xy;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">float2</span> output <span style="color:#f92672">=</span> p <span style="color:#f92672">+</span> ComplexMult(W,q);
+</span></span></code></pre></div><p>where <code>_currentStage</code> is an <code>int</code> representing the current FFT stage and <code>id</code> is an <code>int2</code> representing the current pixel ID being worked on.</p>
+<p>As each input element is used in two distinct butterfly calculations, we cannot overwrite it in the input texture with <code>output</code>. Therefore, we must write the output of a stage of the FFT to its own texture. In practice, we use two textures called <code>_pingpong0Texture</code> and <code>_pingpong1Texture</code>, one of which acts as the input and the other as the output, depending on the value of an integer <code>_pingpong</code>. When <code>_pingpong == 0</code>, <code>_pingpong0Texture</code> is the input and when <code>_pingpong == 1</code>, <code>_pingpong1Texture</code> is the input. The value of this parameter is flipped on the CPU after each FFT step and passed to the compute shader before it is dispatched.</p>
+<p>Here is a complete Unity compute shader for a horizontal butterfly operation using the pingpong textures:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-hlsl" data-lang="hlsl"><span style="display:flex;"><span><span style="color:#75715e">#pragma kernel HorizontalButterfly</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#include &#34;Assets/ShaderIncludes/ComplexNumbers.cginc&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">Texture2D</span><span style="color:#f92672">&lt;</span><span style="color:#66d9ef">float4</span><span style="color:#f92672">&gt;</span> _butterflyTexture;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">RWTexture2D</span><span style="color:#f92672">&lt;</span><span style="color:#66d9ef">float4</span><span style="color:#f92672">&gt;</span> _pingpong0Texture;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">RWTexture2D</span><span style="color:#f92672">&lt;</span><span style="color:#66d9ef">float4</span><span style="color:#f92672">&gt;</span> _pingpong1Texture;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> _N;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">float</span> _PI;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> _currentStage;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> _pingpong; 
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>[<span style="color:#a6e22e">numthreads</span>(<span style="color:#ae81ff">8</span>,<span style="color:#ae81ff">8</span>,<span style="color:#ae81ff">1</span>)]
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> HorizontalButterfly(<span style="color:#66d9ef">uint3</span> id <span style="color:#f92672">:</span> <span style="color:#a6e22e">SV_DispatchThreadID</span>)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">float4</span> butterflyData <span style="color:#f92672">=</span> _butterflyTexture[<span style="color:#66d9ef">int2</span>(_currentStage, id.x)];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">float2</span> W <span style="color:#f92672">=</span> butterflyData.xy;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (_pingpong <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">float2</span> p <span style="color:#f92672">=</span> _pingpong0Texture[<span style="color:#66d9ef">int2</span>(butterflyData.z, id.y)].xy;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">float2</span> q <span style="color:#f92672">=</span> _pingpong0Texture[<span style="color:#66d9ef">int2</span>(butterflyData.w, id.y)].xy;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">float2</span> output <span style="color:#f92672">=</span> p <span style="color:#f92672">+</span> ComplexMult(W,q);
+</span></span><span style="display:flex;"><span>        _pingpong1Texture[id.xy] <span style="color:#f92672">=</span> <span style="color:#66d9ef">float4</span>(output.x, output.y, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span>
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">float2</span> p <span style="color:#f92672">=</span> _pingpong1Texture[<span style="color:#66d9ef">int2</span>(butterflyData.z, id.y)].xy;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">float2</span> q <span style="color:#f92672">=</span> _pingpong1Texture[<span style="color:#66d9ef">int2</span>(butterflyData.w, id.y)].xy;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">float2</span> output <span style="color:#f92672">=</span> p <span style="color:#f92672">+</span> ComplexMult(W,q);
+</span></span><span style="display:flex;"><span>        _pingpong0Texture[id.xy] <span style="color:#f92672">=</span> <span style="color:#66d9ef">float4</span>(output.x, output.y, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="permuting-and-scaling">Permuting and Scaling<a hidden class="anchor" aria-hidden="true" href="#permuting-and-scaling">#</a></h3>
+<p>The final step in the FFT is to permute the output to reflect the fact that our frequency domain centred about zero, rather than starting from zero. What we are calculating at the moment is</p>
+$$
+\begin{align}
+    & \sum_{k=0}^{N-1} \sum_{j=0}^{N-1} f(\mathbf{k}) \exp (\frac{2\pi i}{N} \mathbf{k} \cdot \mathbf{x}) \\
+    &= \sum_{k=0}^{N-1} \sum_{j=0}^{N-1} f(\mathbf{k}) \exp (\frac{2\pi i}{N}kx)\exp (\frac{2\pi i}{N}jy)
+\end{align}
+$$<p>Rearranging this into the desired form we obtain:</p>
+$$
+\begin{align}
+    & \sum_{k=0}^{N-1} \sum_{j=0}^{N-1} f(\mathbf{k}) \exp (\frac{2\pi i}{N}kx)\exp (\frac{2\pi i}{N}jy)\\
+    &= \sum_{k=-\frac{N}{2}}^{\frac{N}{2}-1} \sum_{j=-\frac{N}{2}}^{\frac{N}{2}-1} f(\mathbf{k}) \exp (\frac{2\pi i}{N}(k+ \frac{N}{2})x)\exp (\frac{2\pi i}{N}(j + \frac{N}{2})y) \\
+    &= \exp(\pi i)^x \exp(\pi i)^y  \sum_{k=-\frac{N}{2}}^{\frac{N}{2}-1} \sum_{j=-\frac{N}{2}}^{\frac{N}{2}-1} f(\mathbf{k}) \exp (\frac{2\pi i}{N}kx)\exp (\frac{2\pi i}{N}jy) \\
+    &= (-1)^{x+y}  \sum_{k=-\frac{N}{2}}^{\frac{N}{2}-1} \sum_{j=-\frac{N}{2}}^{\frac{N}{2}-1} f(\mathbf{k}) \exp (\frac{2\pi i}{N}kx)\exp (\frac{2\pi i}{N}jy) \\
+\end{align}
+$$<p>(Note that the argument \(\mathbf{k}\) of \(f\) does not change in the above expression as this argument is purely symbolic). Therefore, to obtain the final heightfield, we must multiply each pixel output by \((-1)^{x+y}\) where \(x\) and \(y\) are the pixel&rsquo;s ID. At this stage we also scale the output by the standard normalisation factor \(\frac{1}{N^2}\).</p>
+<h3 id="putting-it-all-together">Putting it All Together<a hidden class="anchor" aria-hidden="true" href="#putting-it-all-together">#</a></h3>
+<p>With all of the elements of our FFT written, we can now put them together in C#. We dispatch the horizontal butterfly compute shader \(\log_2(N)\) times to complete the \(N\) horizontal FFTs, setting the stage and pingpong variables before each dispatch. We then do the same in the vertical direction using the vertical butterfly compute shader. The output of this is then permuted and scaled to create the final output texture.</p>
+<p>This can be implemented in C# as follows:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-cs" data-lang="cs"><span style="display:flex;"><span><span style="color:#66d9ef">public</span> <span style="color:#66d9ef">void</span> IFFT2D(RenderTexture input, RenderTexture output)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    _pingpong = <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    Graphics.Blit(input, _pingpong0RT);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> (<span style="color:#66d9ef">int</span> i = <span style="color:#ae81ff">0</span>; i &lt; _totalStages; i++)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        _fftCompute.SetInt(<span style="color:#e6db74">&#34;_currentStage&#34;</span>, i);
+</span></span><span style="display:flex;"><span>        _fftCompute.SetInt(<span style="color:#e6db74">&#34;_pingpong&#34;</span>, _pingpong);
+</span></span><span style="display:flex;"><span>        _fftCompute.Dispatch(_horButterflyKernelID, _workGroupCount, _workGroupCount, <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>        _pingpong = (_pingpong + <span style="color:#ae81ff">1</span>) % <span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> (<span style="color:#66d9ef">int</span> i = <span style="color:#ae81ff">0</span>; i &lt; _totalStages; i++)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        _fftCompute.SetInt(<span style="color:#e6db74">&#34;_currentStage&#34;</span>, i);
+</span></span><span style="display:flex;"><span>        _fftCompute.SetInt(<span style="color:#e6db74">&#34;_pingpong&#34;</span>, _pingpong);
+</span></span><span style="display:flex;"><span>        _fftCompute.Dispatch(_verButterflyKernelID, _workGroupCount, _workGroupCount, <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>        _pingpong = (_pingpong + <span style="color:#ae81ff">1</span>) % <span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    _permuteAndScaleCompute.SetTexture(_permuteAndScaleKernelID, <span style="color:#e6db74">&#34;_outputTexture&#34;</span>, output);
+</span></span><span style="display:flex;"><span>    _permuteAndScaleCompute.Dispatch(_permuteAndScaleKernelID, _workGroupCount, _workGroupCount, <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h2 id="rendering-with-higher">Rendering With Higher \(N\)<a hidden class="anchor" aria-hidden="true" href="#rendering-with-higher">#</a></h2>
+<p>Making the jump from the DFT to the FFT, we can now render the water&rsquo;s surface at higher resolutions, being able to push \(N\) up to \(1024\) on my machine. The original DFT implementation required approximately \(N^2\) operations to compute the heightfield, which for \(N= 1024\) means \(1048576\) total operations. The FFT on the other hand requires approximately \(N\log_2(N)\) operations, which for the same value of \(N\) means only \(10240\) total operations. As a result, for \(N=1024\) the FFT is over \(100\) times faster than the DFT.
+
+
+    <center>
+        <figure>
+            <img class="smooth" src="/images/fftWater_3/ocean_1024.jpg" alt="drawing" width="800"/>
+            <figcaption>Ocean surface using \(N=1024\)</figcaption>
+        </figure>
+    </center>
+</p>
+<h2 id="references">References<a hidden class="anchor" aria-hidden="true" href="#references">#</a></h2>
+<ul>
+<li><a href="https://www.google.com/search?client=safari&amp;rls=en&amp;q=Realtime+GPGPU+FFT+Ocean+Water+Simulation&amp;ie=UTF-8&amp;oe=UTF-8&amp;safe=active">Fynn-Jorin Flügge: Realtime GPGPU FFT Ocean Water Simulation</a></li>
+<li><a href="https://www.alwayslearn.com/DFT%20and%20FFT%20Tutorial/DFTandFFT_FFT_Overview.html">Always Learn: A DFT and FFT Tutorial</a></li>
+<li>Ronald N. Bracewell: The Fourier Transform and its Applications (book)</li>
+</ul>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="https://jamesricher.github.io/tags/unity/">Unity</a></li>
+      <li><a href="https://jamesricher.github.io/tags/hlsl/">HLSL</a></li>
+      <li><a href="https://jamesricher.github.io/tags/c%23/">C#</a></li>
+      <li><a href="https://jamesricher.github.io/tags/maths/">Maths</a></li>
+    </ul>
+<nav class="paginav">
+  <a class="prev" href="https://jamesricher.github.io/FFTWaterPart2/">
+    <span class="title">« Prev</span>
+    <br>
+    <span>FFT-Based Water Rendering Part 2: Normals and Ocean Swell</span>
+  </a>
+</nav>
+
+  </footer>
+</article>
+    </main>
+    
+<footer class="footer">
+        <span>&copy; 2025 <a href="https://jamesricher.github.io/">James&#39; Graphics Blog</a></span> · 
+
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>
