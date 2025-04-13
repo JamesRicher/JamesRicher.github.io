@@ -126,7 +126,7 @@ $$
     <center>
         <figure>
             <img class="pixelated" src="/images/fftWater_1/InitialSpec_128.png" alt="drawing" width="500"/>
-            <figcaption>A texture filled with random values, generated as detailed above. Here, the red channel represents the real component and the green channel represents the imaginary component.</figcaption>
+            <figcaption>\(\tilde{h}_0(\mathbf{k})\), again with the real and imaginary parts corresponding to the red and green channels respectively</figcaption>
         </figure>
     </center>
 {{< /rawhtml >}}
