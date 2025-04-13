@@ -122,16 +122,15 @@ $$
 \tilde{h}_0(\mathbf{k}) = \frac{1}{\sqrt{2}}(z_r + iz_i)\sqrt{P(\mathbf{k})}
 $$
 
-Some text here...
-
 {{< rawhtml >}}
     <center>
         <figure>
             <img class="pixelated" src="/images/fftWater_1/random_128.png" alt="drawing" width="500"/>
-            <figcaption>\(\tilde{h}_0(\mathbf{k})\), again with the real and imaginary parts corresponding to the red and green channels respectively</figcaption>
+            <figcaption>A texture filled with random values, generated as detailed above. Here, the red channel represents the real component and the green channel represents the imaginary component.</figcaption>
         </figure>
     </center>
 {{< /rawhtml >}}
+
 
 ## Animating the Spectrum in Time
 The next hurdle to overcome is how we take our static spectrum and progress it through time. While working in the frequency domain, moving forwards in time corresponds to changing the phase of each wave by a constant rate. As the phase of each wave is represented by its complex argument, we can achieve this by rotating each wave's complex amplitude at an appropriate speed (i.e. multiplying by some \(\mathbf{q} \in \mathbb{C}\) with \(| \mathbf{q} | = 1\)). To determine the speed at which we will progress each wave, we use a **dispersion relation** - a function that relates the wavelength, \(k\), of our wave-vector to its frequency. Following Tessendorf's implementation, we will use the dispersion relation 
