@@ -189,7 +189,7 @@ $$
 \mathbf{x} = (\frac{L_x}{N}(p_x - \frac{N}{2}), \frac{L_z}{M}(p_z - \frac{M}{2}))
 $$
 
-The function \(h(\mathbf{x}, t)\) is then calculated by taking a standard 2D Fourier Transform of the moving spectrum as follows:
+The function \(h(\mathbf{x}, t)\) is then calculated by taking a standard 2D DFT of the moving spectrum as follows:
 
 $$
 h(\mathbf{x}, t) = \sum_{\mathbf{k}} \tilde{h}(\mathbf{k}, t) \exp(i\mathbf{k} \cdot \mathbf{x})
